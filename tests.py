@@ -30,10 +30,10 @@ def kochSnowflake(diameter=100, iterations=3):
     return koch[-1]
 
 def kochLamp(
-        top_diameter=100,        # Diameter of tree at widest point
+        Top_diameter=200,        # Diameter of tree at widest point
         height=150,         # Total height of tree
         base_diameter=100,   # Diameter of base Koch snowflake
-        twist_per_100=10,       # Twist of tree base
+        twist_per_100=40,       # Twist of tree base
         slices_per_100=100,      # Slices of base extrusion
         koch_iterations=3,  # iterations of Koch Snowflake
         wall_thickness=2,  # Thickness of walls
@@ -42,36 +42,38 @@ def kochLamp(
     chamfer_r = -2
     _fn = 72
 
+    scaling_per_100 = Top_diameter/base_diameter/height*100
+
     base_shape = kochSnowflake(diameter=base_diameter, iterations=koch_iterations)
     # base_shape = square(base_diameter, center=True)
     inner_shape = offset(r=-wall_thickness, _fn=_fn)(base_shape)
 
     body = linear_extrude(
             height=height,
-            scale=top_diameter/base_diameter,
+            scale=scaling_per_100*height/100,
             twist=twist_per_100*height/100,
             slices=slices_per_100*height/100,
     )(base_shape)
 
     body_floor = linear_extrude(
             height=wall_thickness,
-            scale=top_diameter/base_diameter,
+            scale=scaling_per_100*wall_thickness/100,
             twist=twist_per_100*wall_thickness/100,
             slices=slices_per_100*wall_thickness/100,
     )(base_shape)
 
-    inner_height = height + 2
+    inner_height = height + 1
     inner_body = linear_extrude(
             height=inner_height,
-            scale=top_diameter/base_diameter,
+            scale=scaling_per_100*inner_height/100,
             twist=twist_per_100*inner_height/100,
             slices=slices_per_100*inner_height/100,
     )(inner_shape)
 
 
-    inner_body = color("red")(inner_body)
+    inner_body = color("black")(inner_body)
 
-    result = body-inner_body
+    result = body+inner_body
     result += body_floor
 
 
