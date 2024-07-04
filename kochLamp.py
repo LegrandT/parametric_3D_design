@@ -44,6 +44,7 @@ def kochLamp(
                 scale=diameter/base_diameter,
                 twist=twist,
                 slices=base_slices,
+                convexity = 10,
                 )(snowflake)
 
     inner_body = linear_extrude(
@@ -51,6 +52,7 @@ def kochLamp(
                 scale=(diameter)/(base_diameter),
                 twist=twist,
                 slices=base_slices,
+                convexity = 10,
                 )(snowflake)
 
     inner_body = scale([0.7,0.7,1])(inner_body)

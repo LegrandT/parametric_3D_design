@@ -15,6 +15,7 @@ def koch_line(start, end, factor):
     :param tuple end: (x, y) coordinates of the end point
     :param float factor: the multiple of sixty degrees to rotate
     :returns tuple: tuple of all points of segmentation
+    https://nostarch.com/download/PythonPlayground_SampleChapter1.pdf
     """
 
     # coordinates of the start
@@ -43,7 +44,7 @@ def koch_line(start, end, factor):
 
     return {'a': a, 'b': b, 'c': c, 'd' : d, 'e' : e, 'factor' : factor}
 
-def koch_snowflake(degree, s=5.0):
+def koch_snowflake(degree, d=5.0):
     """Generates all lines for a Koch Snowflake with a given degree.
 
     :param int degree: how deep to go in the branching process
@@ -54,9 +55,15 @@ def koch_snowflake(degree, s=5.0):
     lines = []
 
     # vertices of the initial equilateral triangle
-    A = (0., 0.)
-    B = (s, 0.)
-    C = (s * cos60, s * sin60)
+    # A = (0., 0.)
+    # B = (s, 0.)
+    # C = (s * cos60, s * sin60)
+    # https://math.stackexchange.com/questions/3786698/find-the-two-points-for-an-equilateral-triangle-inscribed-inside-a-circle
+    A = ( -d * sin60, -d/2)
+    B = (d * sin60, -d/2)
+    C = (0, d)
+
+
 
     # set the initial lines
     if degree == 0:
@@ -81,8 +88,9 @@ def koch_snowflake(degree, s=5.0):
 
     return lines
 
-def snowflakes_lines(degree, height, s=5):
-    lines = koch_snowflake(degree=degree, s=s)
+
+def snowflakes_lines(degree, diameter, height):
+    lines = koch_snowflake(degree=degree, d=diameter)
     # extract the line coordinates
     x, y, z = [], [], []
     for l in lines:
@@ -92,21 +100,91 @@ def snowflakes_lines(degree, height, s=5):
 
     return [(x_, y_, z_) for x_, y_, z_ in zip(x, y, z)]
 
+def cumsum(num_list):
+    # Cumulative sum of a list
+    return [0]+[sum(num_list[:i+1]) for i in range(len(num_list))]
+
+def cummult(num_list):
+    # Cumulative multiplication of a list
+    return [1]+[np.prod(num_list[:i+1]) for i in range(len(num_list))]
 
 
-def koch_snowflake_tower(depth, diameter, num_layers, height_per_layer):
+def rotate_layer(layer, i):
+    # Rotate the layer by i degrees
+    angle = i
+    return [(x * np.cos(np.radians(angle)) - y * np.sin(np.radians(angle)), x * np.sin(np.radians(angle)) + y * np.cos(np.radians(angle)), z) for x, y, z in layer]
+
+def scale_layer(layer, scale):
+    # Scale the layer by scale
+    return [(x * scale, y * scale, z) for x, y, z in layer]
+
+def offset_layer(coordinates, distance):
+    coordinates = iter(coordinates)
+    x1, y1, z1 = coordinates.__next__()
+    z = distance
+    points = []
+    for x2, y2, z1 in coordinates:
+        # tangential slope approximation
+        if x1 == x2:
+            continue
+        slope = (y2 - y1) / (x2 - x1)
+        pslope = -1/slope
+        # try:
+        #     slope = (y2 - y1) / (x2 - x1)
+        #     # perpendicular slope
+        #     pslope = -1/slope  # (might be 1/slope depending on direction of travel)
+        # except ZeroDivisionError:
+        #     continue
+        mid_x = (x1 + x2) / 2
+        mid_y = (y1 + y2) / 2
+
+        sign = ((pslope > 0) == (x1 > x2)) * 2 - 1
+
+        # if z is the distance to your parallel curve,
+        # then your delta-x and delta-y calculations are:
+        #   z**2 = x**2 + y**2
+        #   y = pslope * x
+        #   z**2 = x**2 + (pslope * x)**2
+        #   z**2 = x**2 + pslope**2 * x**2
+        #   z**2 = (1 + pslope**2) * x**2
+        #   z**2 / (1 + pslope**2) = x**2
+        #   z / (1 + pslope**2)**0.5 = x
+
+        delta_x = sign * z / ((1 + pslope**2)**0.5)
+        print(pslope, delta_x)
+        delta_y = pslope * delta_x
+
+
+        points.append((mid_x + delta_x, mid_y + delta_y, z1))
+        x1, y1 = x2, y2
+    return points
+
+
+
+def koch_snowflake_tower(depth, diameter, heigth, num_layers, height_per_layer, wall_thickness=2):
 
     print("Generating Koch Snowflake Tower...")
     # Generate the Koch snowflake
-    line_length = np.sqrt(3) * diameter / 2
-    snowflake = snowflakes_lines(depth, diameter, s=line_length)
+    snowflake = snowflakes_lines(depth, diameter, height=heigth)
     snowflake_points = len(snowflake)
 
+    curve_line = [0.5]*(num_layers)
+    curve_line = cumsum(curve_line)
+    scale_line = [1.00]*(num_layers)
+    scale_line = cummult(scale_line)
+    offset_line = [0]*(num_layers)
+    offset_line = cumsum(offset_line)
+
+
+
     vertices, faces = [], []
-    for i in range(num_layers):
+    for i in range(num_layers+1):
         # Generate the vertices for the current layer
-        for j, (x, y, z) in enumerate(snowflake):
-            vertices.append((x, y, z + i * height_per_layer))
+        layer = [(x, y, z + i * height_per_layer) for j, (x, y, z) in enumerate(snowflake)]
+        layer = rotate_layer(layer, curve_line[i])
+        layer = scale_layer(layer, scale_line[i])
+        # layer = offset_layer(layer, offset_line[i])
+        vertices += layer
 
         # Generate the faces for the current layer
         for j in range(snowflake_points - 1):
@@ -115,31 +193,23 @@ def koch_snowflake_tower(depth, diameter, num_layers, height_per_layer):
         faces.append([snowflake_points - 1 + i * snowflake_points, i * snowflake_points, snowflake_points + i * snowflake_points])
         faces.append([snowflake_points + i * snowflake_points, i * snowflake_points, i * snowflake_points + snowflake_points - 1])
 
-    # vertices = [
-    #     (0, 0, 0),  # bottom center point
-    #     (100, 0, 0),  # bottom right point
-    #     (100, 100, 0),  # bottom front point
-    #     (0, 100, 0),  # bottom left point
-    #     (50, 50, 100)  # top point
-    # ]
 
-    # faces = [
-    #     [0, 1, 2],  # bottom face
-    #     [2, 3, 0],  # bottom face
-    #     [0, 1, 4],  # side face
-    #     [1, 2, 4],  # side face
-    #     [2, 3, 4],  # side face
-    #     [3, 0, 4],  # side face
-    # ]
 
     return polyhedron(points=vertices, faces=faces)
 
 if __name__ == '__main__':
-    depth = 3  # Set the depth of the Koch snowflake
-    num_layers = 10  # Number of layers in the tower
-    height_per_layer = 10  # Height of each layer
-    diameter = 100  # Diameter of the Koch snowflake
+    depth = 2  # Set the depth of the Koch snowflake
+    diameter = 50  # Diameter of the Koch snowflake
+    height = 100  # Height of the tower
+    height_per_layer = 1  # Number of layers in the tower
+    bottom_height = 0 # Height of the bottom part of the tower
+    wall_thickness = 2  # Thickness of the walls
 
-    tower = koch_snowflake_tower(depth, diameter, num_layers, height_per_layer)
+    num_layers = int(height/height_per_layer)
+
+    print(f"Number of layers: {num_layers}")
+
+    tower = koch_snowflake_tower(depth, diameter, bottom_height, num_layers, height_per_layer)
+
     tower.save_as_scad()
     # scad_render_to_file(tower, 'koch_snowflake_tower.scad')
