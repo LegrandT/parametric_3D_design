@@ -1,0 +1,11 @@
+{
+    "Lamp": {
+        "height":100,
+        "base_diameter":50,
+        "koch_iterations":3,
+        "wall_thickness":0.4,
+        "height_per_layer":2,
+        "chamfer_r":0
+    }
+
+}
