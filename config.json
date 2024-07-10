@@ -1,4 +1,6 @@
 {
+
+
     "Lamp": {
         "height":100,
         "base_diameter":50,
@@ -6,6 +8,78 @@
         "wall_thickness":0.4,
         "height_per_layer":2,
         "chamfer_r":0
-    }
+    },
 
+    "neutral": {
+        "height":100,
+        "base_diameter":50,
+        "koch_iterations":3,
+        "wall_thickness":0.4,
+        "height_per_layer":2,
+        "chamfer_r":0,
+        "twists_list":
+        [
+            {
+                "type":"sin",
+                "amplitude":10,
+                "period":10,
+                "phase":0
+            }
+        ],
+        "scaling_list":
+        [
+            {
+                "type":"sin",
+                "amplitude":10,
+                "period":10,
+                "phase":0
+            }
+        ]
+    },
+
+    "basic": {
+        "height":100,
+        "base_diameter":50,
+        "koch_iterations":3,
+        "wall_thickness":0.4,
+        "height_per_layer":2,
+        "chamfer_r":0,
+        "twists":
+        [
+            {
+                "type":"sin",
+                "amplitude":10,
+                "period":10,
+                "phase":0
+            }
+        ]
+    },
+
+    "testing": {
+        "height":100,
+        "base_diameter":50,
+        "koch_iterations":3,
+        "wall_thickness":0.4,
+        "height_per_layer":2,
+        "chamfer_r":0,
+        "twists_list":
+        [
+            {
+                "type":"sin",
+                "amplitude":2,
+                "period":100,
+                "phase":0
+            }
+        ],
+        "scaling_list":
+        [
+            {
+                "type":"cos",
+                "amplitude":5,
+                "period":100,
+                "phase":0
+            }
+        ]
+    }
 }
+

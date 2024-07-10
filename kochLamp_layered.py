@@ -5,20 +5,7 @@ from __future__ import division
 import math
 import json
 from solid2 import *
-
-# Load the configuration file
-# config = configparser.ConfigParser()
-# config.read('config.ini')
-
-# # Get the values from the configuration file
-# height = config.getint('Lamp', 'height')
-# base_diameter = config.getint('Lamp', 'base_diameter')
-# koch_iterations = config.getint('Lamp', 'koch_iterations')
-# wall_thickness = config.getfloat('Lamp', 'wall_thickness')
-# height_per_layer = config.getfloat('Lamp', 'height_per_layer')
-# chamfer_r = config.getfloat('Lamp', 'chamfer_r')
-
-# Rest of your code...
+import numpy as np
 
 # Load the configuration from a JSON file
 with open('config.json', 'r') as f:
@@ -26,46 +13,89 @@ with open('config.json', 'r') as f:
 
 
 class KochSnowflake_creator:
-    def __init__(self, diameter=100, iterations=3):
-        self.diameter = diameter
-        self.iterations = iterations
-        self.wall_thickness=0.4,  # Thickness of walls
-        self.height_per_layer=2,  # Height of each layer
+    def __init__(self, config_dict=None):
         self.chamfer_r = 0
         self.body = None
-        self.num_layers = int(height/height_per_layer)
-        self.floor_layer = int(wall_thickness/height_per_layer)
+        self.set_config(config_dict)
 
-    def get_config(self):
-        return config
-
-    def set_config(self, config_dict):
+    def set_config(self, config_dict=None):
+        if config_dict is None:
+            config_dict = {"height": 100, "base_diameter": 50, "koch_iterations": 3, "wall_thickness": 0.4, "height_per_layer": 2, "chamfer_r": 0}
         self.height = config_dict['height']
         self.base_diameter = config_dict['base_diameter']
         self.koch_iterations = config_dict['koch_iterations']
         self.wall_thickness = config_dict['wall_thickness']
         self.height_per_layer = config_dict['height_per_layer']
         self.chamfer_r = config_dict['chamfer_r']
-
+        self.twists_list = []
+        if "twists_list" in config_dict:
+            self.twists_list = config_dict['twists_list']
+        self.scaling_list = []
+        if "scaling_list" in config_dict:
+            self.scaling_list = config_dict['scaling_list']
+        self.num_layers = int(self.height/self.height_per_layer)
+        self.floor_layer = int(self.wall_thickness/self.height_per_layer)
+        self._fn = 72
 
     def switch_config(self, config_name):
-        # Get the values from the configuration
-        self.height = config[config_name]['height']
-        self.base_diameter = config[config_name]['base_diameter']
-        self.koch_iterations = config[config_name]['koch_iterations']
-        self.wall_thickness = config[config_name]['wall_thickness']
-        self.height_per_layer = config[config_name]['height_per_layer']
-        self.chamfer_r = config[config_name]['chamfer_r']
+        self.set_config(config[config_name])
 
-    def get_sin_cos(self, function='sin', amplitude=1, period=1, phase=0):
+    def save_config(self, filename='config.json'):
+        current_config = {
+            "height": self.height,
+            "base_diameter": self.base_diameter,
+            "koch_iterations": self.koch_iterations,
+            "wall_thickness": self.wall_thickness,
+            "height_per_layer": self.height_per_layer,
+            "chamfer_r": self.chamfer_r,
+            "twists_list": self.twists_list,
+            "scaling_list": self.scaling_list
+        }
+        with open(filename, 'a') as f:
+            json.dump(current_config, f)
+
+    def save_as_scad(self, filename=None):
+        if self.body is None:
+            print("No object to save")
+            return
+        if filename is None:
+            self.body.save_as_scad(filename)
+        else:
+            scad_render_to_file(self.body, 'filename')
+
+    def save_as_stl(self, filename=None):
+        if self.body is None:
+            print("No object to save")
+            return
+        if filename is not None:
+            self.body.save_as_stl(filename)
+        else:
+            print("No filename provided")
+
+    def get_sin_cos(self, function='sin', amplitude=1, period=1, phase=0, n_points=100, way = 'twist'):
+        scaled_period = period/self.height_per_layer
+        scaled_phase = phase/self.height_per_layer
+        if way == 'twist':
+            amplitude = amplitude*self.height_per_layer
+        if way == 'scale':
+            amplitude = amplitude*self.base_diameter/100
+            n_points += 1
         if function == 'sin':
-            return [amplitude * math.sin(2 * math.pi * i / period + phase) for i in range(self.num_layers)]
+            return [amplitude * math.sin(2 * math.pi * i / scaled_period + 2*math.pi*scaled_phase/scaled_period) for i in range(n_points)]
         elif function == 'cos':
-            return [amplitude * math.cos(2 * math.pi * i / period + phase) for i in range(self.num_layers)]
+            return [amplitude * math.cos(2 * math.pi * i / scaled_period + 2*math.pi*scaled_phase/scaled_period) for i in range(n_points)]
         else:
             return None
 
-    def kochSnowflake(diameter=100, iterations=3):
+    def get_line(self, twist, n_points, way='twist'):
+        if twist['type'] == 'sin' or twist['type'] == 'cos':
+            return self.get_sin_cos(function=twist['type'], amplitude=twist['amplitude'], period=twist['period'], phase=twist['phase'], n_points = n_points, way = way)
+        if twist['type'] == 'total_scale':
+            return [i/n_points*self.base_diameter*(twist['scale']-1) for i in range(n_points)]
+        if twist['type'] == 'constant':
+            return [i*twist['value']/self.num_layers for i in range(n_points)]
+
+    def kochSnowflake(self, diameter=100, iterations=3):
         rad = diameter/2
         xrad = rad*math.sqrt(3)/2
         yrad = rad/2
@@ -86,212 +116,86 @@ class KochSnowflake_creator:
             koch.append(shape)
         return koch[-1]
 
-
     def create(self):
-        num_layers = int(height/height_per_layer)
-        floor_layer = int(wall_thickness/height_per_layer)
-
-
-        _fn = 72
-
-        shape = self.kochSnowflake(diameter=base_diameter, iterations=koch_iterations)
-        shape = offset(r=-chamfer_r, _fn=_fn)(shape)
-        shape = offset(r=chamfer_r*2, _fn=_fn)(shape)
-        shape = offset(r=-chamfer_r, _fn=_fn)(shape)
+        shape = self.kochSnowflake(diameter=self.base_diameter, iterations=self.koch_iterations)
+        if self.chamfer_r > 0:
+            shape = offset(r=-self.chamfer_r, _fn=self._fn)(shape)
+            shape = offset(r=self.chamfer_r*2, _fn=self._fn)(shape)
+            shape = offset(r=-self.chamfer_r, _fn=self._fn)(shape)
 
         body = None
-        # # rota_list = [2]*(num_layers)
-        # rota_list = [2 * math.sin(math.pi * i / num_layers) for i in range(num_layers)]
 
+        rota_list = [0]*self.num_layers
+        scaling = [1]*self.num_layers
 
-        # # Parameters
-        # amplitude = 10 # hight of the curve
-        # period = 10 # width of the curve
-        # frequency = 2 * math.pi / period # frequency of the curve
-        # phase = 0 # shift the curve to the right
-            # rota_list = [2]*(num_layers)
-
-        # TODO add scale with layer
-        # Parameters
-        amplitude = 2 # height of the curve
-        period = 100/height_per_layer # width of the curve
-        frequency = 2 * math.pi / period # frequency of the curve
-        phase = 0 # shift the curve to the right
-        rota_list = [amplitude * math.sin(frequency * i + phase) for i in range(num_layers)]
-
-        # Parameters
-        amplitude = 5 # hight of the curve
-        period = 100/height_per_layer # width of the curve
-        frequency = 2 * math.pi / period # frequency of the curve
-        phase = 0 # shift the curve to the right
-        scaling = [1.00]*(num_layers)
-        scaling = [amplitude * math.cos(frequency * x + phase) for x in range(num_layers+1)]
-        scaling = [(base_diameter+scaling[i]*2)/(base_diameter+scaling[i+1]*2) for i in range(num_layers)]
-
+        if len(self.twists_list) > 0:
+            rota_list = sum(np.array(self.get_line(t, self.num_layers, way="twist")) for t in self.twists_list)
+        if len(self.scaling_list) > 0:
+            scaling = sum(np.array(self.get_line(s, self.num_layers+1, way="scale")) for s in self.scaling_list)
+            scaling = [(self.base_diameter+scaling[i+1]*2)/(self.base_diameter+scaling[i]*2) for i in range(self.num_layers)]
         hollow = False
-        for i in range(num_layers):
-            if i>floor_layer and not hollow:
-                if chamfer_r > 0:
-                    inner_shape = offset(r=-wall_thickness, _fn=_fn)(shape)
+        for i in range(self.num_layers):
+            if i > self.floor_layer and not hollow:
+                if self.chamfer_r > 0:
+                    inner_shape = offset(r=-self.wall_thickness, _fn=self._fn)(shape)
                 else:
-                    inner_shape = offset(delta=-wall_thickness, _fn=_fn)(shape)
-                # inner_shape = offset(r=-wall_thickness, _fn=_fn)(shape)
+                    inner_shape = offset(delta=-self.wall_thickness, _fn=self._fn)(shape)
                 shape = shape-inner_shape
                 hollow = True
             layer = linear_extrude(
-                height=height_per_layer,
+                height=self.height_per_layer,
                 scale=scaling[i],
                 twist=-rota_list[i],
                 slices=1,
             )(shape)
-            layer = translate([0,0,height_per_layer*i])(layer)
+            layer = translate([0, 0, self.height_per_layer*i])(layer)
             if body:
                 body += layer
             else:
                 body = layer
 
-            if i!=num_layers-1:
-                shape = rotate([0,0,rota_list[i]])(shape)
+            if i != self.num_layers-1:
+                shape = rotate([0, 0, rota_list[i]])(shape)
                 shape = scale([scaling[i], scaling[i], 1])(shape)
 
         self.body = body
 
-    def save_as_scad(self, filename=None):
-        if self.body is None:
-            print("No object to save")
-            return
-        if filename is None:
-            fractalLamp.save_as_scad(filename)
-        else:
-            scad_render_to_file(fractalLamp, 'filename')
-
-def get_config():
-
-    return config
-
-# Get the values from the configuration
-height = config['Lamp']['height']
-base_diameter = config['Lamp']['base_diameter']
-koch_iterations = config['Lamp']['koch_iterations']
-wall_thickness = config['Lamp']['wall_thickness']
-height_per_layer = config['Lamp']['height_per_layer']
-chamfer_r = config['Lamp']['chamfer_r']
-
-
-# def kochSnowflake(diameter=100, iterations=3):
-#     rad = diameter/2
-#     xrad = rad*math.sqrt(3)/2
-#     yrad = rad/2
-#     # Make an equilateral triangle with circumradius=rad
-#     koch = [polygon([(0,rad), (-xrad, -yrad), (xrad, -yrad)])]
-#     # Rotate triangle and union to make hexagram
-#     hexagram = union()(koch[0], rotate(60)(koch[0]))
-#     koch.append(hexagram)
-#     if iterations < 2:
-#         return koch[iterations]
-#     for level in range(1, iterations):  # indicates level we are building from
-#         shape = koch[level]
-#         for i in range(6):
-#             shape = union()(
-#                 rotate(60)(shape),
-#                 translate([0,rad*2/3,0])(scale(1/3)(koch[level])),
-#                 )
-#         koch.append(shape)
-#     return koch[-1]
-
-# def kochLamp(
-#         height=100,         # Total height of tree
-#         base_diameter=50,   # Diameter of base Koch snowflake
-#         koch_iterations=3,  # iterations of Koch Snowflake
-#         wall_thickness=0.4,  # Thickness of walls
-#         height_per_layer=2,  # Height of each layer
-#         chamfer_r = 0
-#         ):
-
-#     num_layers = int(height/height_per_layer)
-#     floor_layer = int(wall_thickness/height_per_layer)
-
-
-#     _fn = 72
-
-#     shape = kochSnowflake(diameter=base_diameter, iterations=koch_iterations)
-#     shape = offset(r=-chamfer_r, _fn=_fn)(shape)
-#     shape = offset(r=chamfer_r*2, _fn=_fn)(shape)
-#     shape = offset(r=-chamfer_r, _fn=_fn)(shape)
-
-#     body = None
-#     # # rota_list = [2]*(num_layers)
-#     # rota_list = [2 * math.sin(math.pi * i / num_layers) for i in range(num_layers)]
-
-
-#     # # Parameters
-#     # amplitude = 10 # hight of the curve
-#     # period = 10 # width of the curve
-#     # frequency = 2 * math.pi / period # frequency of the curve
-#     # phase = 0 # shift the curve to the right
-#         # rota_list = [2]*(num_layers)
-
-#     # TODO add scale with layer
-#     # Parameters
-#     amplitude = 2 # hight of the curve
-#     period = 100/height_per_layer # width of the curve
-#     frequency = 2 * math.pi / period # frequency of the curve
-#     phase = 0 # shift the curve to the right
-#     rota_list = [amplitude * math.sin(frequency * i + phase) for i in range(num_layers)]
-
-#     # Parameters
-#     amplitude = 5 # hight of the curve
-#     period = 100/height_per_layer # width of the curve
-#     frequency = 2 * math.pi / period # frequency of the curve
-#     phase = 0 # shift the curve to the right
-#     scaling = [1.00]*(num_layers)
-#     scaling = [amplitude * math.cos(frequency * x + phase) for x in range(num_layers+1)]
-#     scaling = [(base_diameter+scaling[i]*2)/(base_diameter+scaling[i+1]*2) for i in range(num_layers)]
-
-#     hollow = False
-#     for i in range(num_layers):
-#         if i>floor_layer and not hollow:
-#             if chamfer_r > 0:
-#                 inner_shape = offset(r=-wall_thickness, _fn=_fn)(shape)
-#             else:
-#                 inner_shape = offset(delta=-wall_thickness, _fn=_fn)(shape)
-#             # inner_shape = offset(r=-wall_thickness, _fn=_fn)(shape)
-#             shape = shape-inner_shape
-#             hollow = True
-#         layer = linear_extrude(
-#             height=height_per_layer,
-#             scale=scaling[i],
-#             twist=-rota_list[i],
-#             slices=1,
-#         )(shape)
-#         layer = translate([0,0,height_per_layer*i])(layer)
-#         if body:
-#             body += layer
-#         else:
-#             body = layer
-
-#         if i!=num_layers-1:
-#             shape = rotate([0,0,rota_list[i]])(shape)
-#             shape = scale([scaling[i], scaling[i], 1])(shape)
-
-#     result = body
-
-#     return result
-
-
 if __name__ == '__main__':
-    # fractalLamp = kochLamp(
-    #     height=height,
-    #     base_diameter=base_diameter,
-    #     koch_iterations=koch_iterations,
-    #     wall_thickness=wall_thickness,
-    #     height_per_layer=height_per_layer,
-    #     chamfer_r=chamfer_r
-    #     )
-    creator = KochSnowflake_creator()
 
+    config_dict = {
+        "height":100,
+        "base_diameter":50,
+        "koch_iterations":3,
+        "wall_thickness":0.4,
+        "height_per_layer":20,
+        "chamfer_r":0,
+        "twists_list":
+        [
+            # {
+            #     "type":"sin",
+            #     "amplitude":2,
+            #     "period":100,
+            #     "phase":0
+            # }
+        ],
+        "scaling_list":
+        [
+            {
+                "type":"cos",
+                "amplitude":5,
+                "period":100,
+                "phase":50
+            }
+        ]
+    }
+
+
+    creator = KochSnowflake_creator(config_dict)
+    # creator.switch_config('testing')
     creator.create()
     creator.save_as_scad()
+    # stl_filename = 'kochLamp.stl'
+    # creator.save_as_stl(stl_filename)
     # print(scad_render(fractalChrismasTree))
 
     # save your model for use in OpenSCAD
