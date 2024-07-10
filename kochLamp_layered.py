@@ -79,7 +79,6 @@ class KochSnowflake_creator:
             amplitude = amplitude*self.height_per_layer
         if way == 'scale':
             amplitude = amplitude*self.base_diameter/100
-            n_points += 1
         if function == 'sin':
             return [amplitude * math.sin(2 * math.pi * i / scaled_period + 2*math.pi*scaled_phase/scaled_period) for i in range(n_points)]
         elif function == 'cos':
@@ -129,34 +128,30 @@ class KochSnowflake_creator:
         scaling = [1]*self.num_layers
 
         if len(self.twists_list) > 0:
-            rota_list = sum(np.array(self.get_line(t, self.num_layers, way="twist")) for t in self.twists_list)
+            rota_list = sum(np.array(self.get_line(t, self.num_layers+1, way="twist")) for t in self.twists_list)
+            rota_list = [rota_list[i+1]-rota_list[i] for i in range(self.num_layers)]
         if len(self.scaling_list) > 0:
             scaling = sum(np.array(self.get_line(s, self.num_layers+1, way="scale")) for s in self.scaling_list)
             scaling = [(self.base_diameter+scaling[i+1]*2)/(self.base_diameter+scaling[i]*2) for i in range(self.num_layers)]
+
         hollow = False
         for i in range(self.num_layers):
-            if i > self.floor_layer and not hollow:
+            if not hollow and i > self.floor_layer:
                 if self.chamfer_r > 0:
                     inner_shape = offset(r=-self.wall_thickness, _fn=self._fn)(shape)
                 else:
                     inner_shape = offset(delta=-self.wall_thickness, _fn=self._fn)(shape)
                 shape = shape-inner_shape
                 hollow = True
-            layer = linear_extrude(
-                height=self.height_per_layer,
-                scale=scaling[i],
-                twist=-rota_list[i],
-                slices=1,
-            )(shape)
+            layer = linear_extrude(height=self.height_per_layer, scale=scaling[i], twist=-rota_list[i], slices=1,)(shape)
             layer = translate([0, 0, self.height_per_layer*i])(layer)
             if body:
                 body += layer
             else:
                 body = layer
 
-            if i != self.num_layers-1:
-                shape = rotate([0, 0, rota_list[i]])(shape)
-                shape = scale([scaling[i], scaling[i], 1])(shape)
+            shape = rotate([0, 0, rota_list[i]])(shape)
+            shape = scale([scaling[i], scaling[i], 1])(shape)
 
         self.body = body
 
@@ -167,25 +162,25 @@ if __name__ == '__main__':
         "base_diameter":50,
         "koch_iterations":3,
         "wall_thickness":0.4,
-        "height_per_layer":20,
+        "height_per_layer":2,
         "chamfer_r":0,
         "twists_list":
         [
-            # {
-            #     "type":"sin",
-            #     "amplitude":2,
-            #     "period":100,
-            #     "phase":0
-            # }
+            {
+                "type":"sin",
+                "amplitude":20,
+                "period":100,
+                "phase":25
+            }
         ],
         "scaling_list":
         [
-            {
-                "type":"cos",
-                "amplitude":5,
-                "period":100,
-                "phase":50
-            }
+            # {
+            #     "type":"cos",
+            #     "amplitude":5,
+            #     "period":100,
+            #     "phase":50
+            # }
         ]
     }
 
