@@ -6,6 +6,8 @@ import math
 import json
 from solid2 import *
 import numpy as np
+import os
+from subprocess import run
 
 # Load the configuration from a JSON file
 with open('config.json', 'r') as f:
@@ -61,28 +63,36 @@ class KochSnowflake_creator:
         if filename is None:
             self.body.save_as_scad(filename)
         else:
-            scad_render_to_file(self.body, 'filename')
+            scad_render_to_file(self.body, filename)
 
     def save_as_stl(self, filename=None):
         if self.body is None:
             print("No object to save")
             return
         if filename is not None:
+            if not os.path.exists(filename):
+                with open(filename, 'w') as f:
+                    f.write('')
             self.body.save_as_stl(filename)
         else:
             print("No filename provided")
+            return
 
-    def get_sin_cos(self, function='sin', amplitude=1, period=1, phase=0, n_points=100, way = 'twist'):
+    def get_sin_cos(self, function='sin', amplitude=1, period=1, phase=0, n_points=100, way = 'twist', over_0 = True):
         scaled_period = period/self.height_per_layer
         scaled_phase = phase/self.height_per_layer
+        if over_0:
+            curve_offset = amplitude/2
+        else:
+            curve_offset = 0
         if way == 'twist':
             amplitude = amplitude*self.height_per_layer
         if way == 'scale':
             amplitude = amplitude*self.base_diameter/100
         if function == 'sin':
-            return [amplitude * math.sin(2 * math.pi * i / scaled_period + 2*math.pi*scaled_phase/scaled_period) for i in range(n_points)]
+            return [curve_offset+amplitude * math.sin(2 * math.pi * i / scaled_period + 2*math.pi*scaled_phase/scaled_period) for i in range(n_points)]
         elif function == 'cos':
-            return [amplitude * math.cos(2 * math.pi * i / scaled_period + 2*math.pi*scaled_phase/scaled_period) for i in range(n_points)]
+            return [curve_offset+amplitude * math.cos(2 * math.pi * i / scaled_period + 2*math.pi*scaled_phase/scaled_period) for i in range(n_points)]
         else:
             return None
 
@@ -161,25 +171,29 @@ if __name__ == '__main__':
         "height":100,
         "base_diameter":50,
         "koch_iterations":3,
-        "wall_thickness":0.4,
-        "height_per_layer":2,
-        "chamfer_r":0,
+        "wall_thickness":0.8,
+        "height_per_layer":50,
+        "chamfer_r":0.4,
         "twists_list":
         [
-            {
-                "type":"sin",
-                "amplitude":20,
-                "period":100,
-                "phase":25
-            }
+            # {
+            #     "type":"sin",
+            #     "amplitude":15,
+            #     "period":100,
+            #     "phase":25
+            # }
         ],
         "scaling_list":
         [
             # {
             #     "type":"cos",
-            #     "amplitude":5,
+            #     "amplitude":15,
             #     "period":100,
             #     "phase":50
+            # },
+            # {
+            #     "type":"total_scale",
+            #     "scale":1.5
             # }
         ]
     }
@@ -188,10 +202,12 @@ if __name__ == '__main__':
     creator = KochSnowflake_creator(config_dict)
     # creator.switch_config('testing')
     creator.create()
-    creator.save_as_scad()
-    # stl_filename = 'kochLamp.stl'
-    # creator.save_as_stl(stl_filename)
-    # print(scad_render(fractalChrismasTree))
+    scad_filename = 'kochLamp_layered.scad'
+    stl_filename = scad_filename[:-5] + '.stl'
 
-    # save your model for use in OpenSCAD
-    # fractalLamp.save_as_scad()
+
+    creator.save_as_scad(scad_filename)
+    print("scad saved under name " + scad_filename)
+
+    creator.save_as_stl(stl_filename)
+    print("stl saved under name " + stl_filename)
