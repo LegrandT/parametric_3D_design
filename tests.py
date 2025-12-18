@@ -146,9 +146,7 @@ class KochSnowflake_creator:
             scaling_points = sum(np.array(self.get_line(s, self.num_layers, way="scale")) for s in self.scaling_list)
             scaling = [(self.base_diameter+scaling_points[i+1]*2)/(self.base_diameter+scaling_points[i]*2) for i in range(self.num_layers)]
             scaling_inner = [(self.base_diameter+scaling_points[i+1]*2-self.wall_thickness*2)/(self.base_diameter+scaling_points[i]*2-self.wall_thickness*2) for i in range(self.num_layers)]
-            print(scaling_points)
-            print(scaling)
-            print(scaling_inner)
+
 
 
         if self.chamfer_r > 0:
@@ -175,7 +173,7 @@ class KochSnowflake_creator:
             inner_shape = rotate([0, 0, rota_list[i]])(inner_shape)
             inner_shape = scale([scaling_inner[i], scaling_inner[i], 1])(inner_shape)
 
-        self.body = body
+        self.body = minkowski()(body, cube(size=[2, 2, 2]))
 
 if __name__ == '__main__':
 
@@ -185,7 +183,7 @@ if __name__ == '__main__':
         "koch_iterations":3,
         # "wall_thickness":0.8,
         "wall_thickness":4,
-        "height_per_layer":10,
+        "height_per_layer":100,
         "chamfer_r":0,
         "twists_list":
         [

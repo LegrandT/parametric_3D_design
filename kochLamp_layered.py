@@ -146,13 +146,13 @@ class KochSnowflake_creator:
 
         hollow = False
         for i in range(self.num_layers):
-            if not hollow and i > self.floor_layer:
-                if self.chamfer_r > 0:
-                    inner_shape = offset(r=-self.wall_thickness, _fn=self._fn)(shape)
-                else:
-                    inner_shape = offset(delta=-self.wall_thickness, _fn=self._fn)(shape)
-                shape = shape-inner_shape
-                hollow = True
+            # if not hollow and i > self.floor_layer:
+            #     if self.chamfer_r > 0:
+            #         inner_shape = offset(r=-self.wall_thickness, _fn=self._fn)(shape)
+            #     else:
+            #         inner_shape = offset(delta=-self.wall_thickness, _fn=self._fn)(shape)
+            #     shape = shape-inner_shape
+            #     hollow = True
             layer = linear_extrude(height=self.height_per_layer, scale=scaling[i], twist=-rota_list[i], slices=1,)(shape)
             layer = translate([0, 0, self.height_per_layer*i])(layer)
             if body:
@@ -172,29 +172,25 @@ if __name__ == '__main__':
         "base_diameter":50,
         "koch_iterations":3,
         "wall_thickness":0.8,
-        "height_per_layer":50,
+        "height_per_layer":2,
         "chamfer_r":0.4,
         "twists_list":
         [
-            # {
-            #     "type":"sin",
-            #     "amplitude":15,
-            #     "period":100,
-            #     "phase":25
-            # }
+            {
+                "type":"cos",
+                "amplitude":35,
+                "period":300,
+                "phase":100
+            }
         ],
         "scaling_list":
         [
-            # {
-            #     "type":"cos",
-            #     "amplitude":15,
-            #     "period":100,
-            #     "phase":50
-            # },
-            # {
-            #     "type":"total_scale",
-            #     "scale":1.5
-            # }
+            {
+                "type":"sin",
+                "amplitude":20,
+                "period":100,
+                "phase":0
+            }
         ]
     }
 
@@ -209,5 +205,5 @@ if __name__ == '__main__':
     creator.save_as_scad(scad_filename)
     print("scad saved under name " + scad_filename)
 
-    creator.save_as_stl(stl_filename)
-    print("stl saved under name " + stl_filename)
+    # creator.save_as_stl(stl_filename)
+    # print("stl saved under name " + stl_filename)

@@ -80,6 +80,37 @@
                 "phase":0
             }
         ]
+    },
+
+    "first_done":{
+        "height":100,
+        "base_diameter":50,
+        "koch_iterations":3,
+        "wall_thickness":0.8,
+        "height_per_layer":2,
+        "chamfer_r":0.4,
+        "twists_list":
+        [
+            {
+                "type":"sin",
+                "amplitude":15,
+                "period":100,
+                "phase":25
+            }
+        ],
+        "scaling_list":
+        [
+            {
+                "type":"cos",
+                "amplitude":15,
+                "period":100,
+                "phase":50
+            },
+            {
+                "type":"total_scale",
+                "scale":1.5
+            }
+        ]
     }
 }
 
